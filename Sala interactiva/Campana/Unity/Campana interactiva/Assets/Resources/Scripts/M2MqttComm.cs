@@ -52,10 +52,12 @@ namespace M2MqttUnity.Examples
         public bool autoTest = false;
 
         [Header("User Interface")]
-        string[] topicos = {
-            "prueba/M2MQTT/campana/angulo", //topico de recepcion de datos
-            "prueba/M2MQTT/campana/cmd",    //topico de recepción de comandos
-                            };
+
+       
+        //string[] topicos = {
+        //    "prueba/M2MQTT/campana/angulo", //topico de recepcion de datos
+        //    "prueba/M2MQTT/campana/cmd",    //topico de recepción de comandos
+        //                    };
 
         // propiedades de clase
         public TMP_InputField consoleInputField;
@@ -75,23 +77,33 @@ namespace M2MqttUnity.Examples
         #region conexionBroker
 
         //Se carga la dirección IP  del Broker a memoria (como propiedad de la clase base M2MQTTUnityClient)
+        //Solo se ocupa cuando se quiera cambiar el broker
+        //Broker default: 'iot.inventoteca.com'
         public void SetBrokerAddress(string brokerAddress)
         {
             if (broker && !updateUI)
             {
-                this.brokerAddress = brokerAddress;
+                GameManager.broker = brokerAddress;
+                this.brokerAddress = GameManager.broker;
                 Debug.Log(this.brokerAddress);
+                GameManager.UpdateUI = true;
             }
         }
 
         //Se carga el valor del puerto del broker en memoria (como propiedad de la clase base M2MQTTUnityClient)
+        //Solo se ocupa cuando se quiera cambiar el puerto
+        //Puerto default: '1883'
         public void SetBrokerPort(string brokerPort)
         {
             if (puerto && !updateUI)
             {
                 int.TryParse(brokerPort, out this.brokerPort);
+                GameManager.brokerPort = this.brokerPort.ToString();
+                GameManager.UpdateUI = true;
             }
         }
+
+
 
 
         protected override void OnConnecting()
@@ -105,25 +117,66 @@ namespace M2MqttUnity.Examples
             base.OnConnected();
             SetUiMessage("Connected to broker on " + brokerAddress + "\n");
             GameManager.ConectadoABroker = true;
+            GameManager.UpdateUI = true;
         }
 
-        // Método para suscribirte al tópico "topico". Se llama en la función OnConnected de la clase
-        // base M2MqttUnityClient
+
+        // Método para suscribirte al tópico "topico" con QoS = QoS, llamado si se quiere agregar un tópico extra a 
+        // las suscripciones
+        void SubscribeToTopic(string topico, byte QoS)
+        {
+            GameManager.topicos.Add(topico);
+            client.Subscribe(new string[] { topico }, new byte[] { QoS });
+            GameManager.UpdateUI = true;
+        }
+
+
+        // Método para suscribirse a los tópicos presentes en la Lista de tópicos del GameManager
+        // Se llama en la función OnConnected de la clase base M2MQTTUnityClient
         protected override void SubscribeTopics()
         {
-            //Se suscribe al tópico del ángulo de la campana
-            client.Subscribe(new string[] { topicos[0] }, new byte[] { MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE });
-            //Se suscribe al tópico de comandos
-            client.Subscribe(new string[] { topicos[1] }, new byte[] { MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE });
+            int nTopicos = GameManager.topicos.Count;
+            //Si no hay ningún tópico suscrito se suscribe a los obligatorios (angulo y cmd)
+            if (nTopicos == 1)
+            {
+                string[] topicos = new string[] { "prueba/M2MQTT/campana/angulo",
+                                                  "prueba/M2MQTT/campana/cmd" };
+                GameManager.topicos.AddRange(topicos);
+                nTopicos = 3;
+            }
+
+            //Se suscribe a todos los tópicos de la lista con un QoS = 2
+            for(int i = 1; i < nTopicos; i++)
+            {
+                client.Subscribe(new string[] { GameManager.topicos[i] }, new byte[] { MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE });
+            }
+            GameManager.UpdateUI = true;
+
         }
 
-        // Método para des-suscribirte al tópico "topico". Se llama en la función CloseConnection de la
-        // clase base M2MqttUnityClient
+        // Método para des-suscribirte al tópico "topico" 
+        void UnsubscribeToTopic(string topico)
+        {
+            if(topico != "topicos suscritos")
+            {
+                GameManager.topicos.Remove(topico);
+                client.Unsubscribe(new string[] { topico });
+                GameManager.UpdateUI = true;
+            }
+        }
+
+        // Método para des-suscribirte a todos los tópicos. Se llama en la función CloseConnection de la
+        // clase base M2MqttUnityClient o de forma manual.
         protected override void UnsubscribeTopics()
         {
-            //Se des-suscribe de los topicos suscritos anteriormente
-            client.Unsubscribe(new string[] { topicos[0] });
-            client.Unsubscribe(new string[] { topicos[1] });
+            int nTopicos = GameManager.topicos.Count;
+            for (int i  = 0;  i < nTopicos; i++)
+            {
+                client.Unsubscribe(new string[] { GameManager.topicos[i] });
+            }
+            GameManager.topicos.Clear();
+            GameManager.topicos.Add("topicos suscritos");
+            GameManager.UpdateUI = true;
         }
 
         //Se ejecuta cuando la conección falla 
@@ -149,6 +202,13 @@ namespace M2MqttUnity.Examples
         #endregion
 
         #region MonoBehaviour
+
+        protected override void Awake()
+        {
+            base.Awake();
+            SetBrokerAddress(GameManager.broker);
+            SetBrokerPort(GameManager.brokerPort);
+        }
 
         protected override void Start()
         {
@@ -218,7 +278,7 @@ namespace M2MqttUnity.Examples
 
         #region Comunicacion
 
-        // Publica el 'mensaje' al 'tópico' con un 'QoS'
+        // Publica el 'mensaje' al 'tópico' con un 'QoS' sin bandera de retención
         public void Publish(string topico, string mensaje, byte QoS)
         {
             byte[] msg = System.Text.Encoding.UTF8.GetBytes(mensaje);
@@ -227,10 +287,10 @@ namespace M2MqttUnity.Examples
         }
         
         //Publica un mensaje "PruebaCMD" en el tópico de comandos con un QoS = 2;
-        public void TestPublish()
-        {
-            Publish(topicos[1], "pruebaCMD", MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE);
-        }
+        //public void TestPublish()
+        //{
+        //    Publish(topicos[1], "pruebaCMD", MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE);
+        //}
 
         //Obtiene el mensaje como string y lo anexa a la lista eventMessages
         protected override void DecodeMessage(string topic, byte[] message)
@@ -240,7 +300,7 @@ namespace M2MqttUnity.Examples
             StoreMessage(msg);
 
             //Si el mensaje proviene del topico cmd, añade el mensaje a la cola de comandos
-            if (topic == topicos[1])
+            if (topic == "prueba/M2MQTT/campana/cmd")
             {
                 GameManager.cmds.Add(msg);
             }
@@ -333,6 +393,38 @@ namespace M2MqttUnity.Examples
             updateUI = false;
         }
 
+        public void ConnectDisconnect()
+        {
+            //Si está conectado al Broker lo desconecta, si no, conecta
+            if (GameManager.ConectadoABroker)
+            {
+                Disconnect();
+            }
+            else
+            {
+                Connect();
+            }
+        }
+
+        public void SubUnsub()
+        {
+            if (!GameManager.SubUnsub)
+            {
+                if (GameManager.topicos.Contains(GameManager.topico))
+                {
+                    int indice = GameManager.topicos.IndexOf(GameManager.topico);
+                    UnsubscribeToTopic(GameManager.topicos[indice]);
+                    GameManager.valorDrop = 0;
+                    Debug.Log("Desuscrito");
+                }
+            }
+            else
+            {
+                SubscribeToTopic(GameManager.topico, MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE);
+                Debug.Log("suscrito");
+            }
+            GameManager.UpdateUI = true;
+        }
 
         #endregion
 
@@ -355,13 +447,13 @@ namespace M2MqttUnity.Examples
         {
             string command = cmd.ToUpper();
             // Proponer una lista de comandos para ejecutar a distancia
-            if (cmd == "EXIT") { Debug.Log("Saliendo de App"); }
-            if (cmd == "PAUSE") { Debug.Log("App en pausa"); }
-            if (cmd == "PLAY") { Debug.Log("Reanudando"); }
-            if (cmd.Contains("M:"))
+            if (command == "EXIT") { Debug.Log("Saliendo de App"); }
+            if (command == "PAUSE") { Debug.Log("App en pausa"); }
+            if (command == "PLAY") { Debug.Log("Reanudando"); }
+            if (command.Contains("M:"))
             {
-                int lenght = cmd.Length;
-                string msg = cmd.Substring("M:".Length, lenght - "M:".Length);
+                int lenght = command.Length;
+                string msg = command.Substring("M:".Length, lenght - "M:".Length);
                 Debug.Log("mensaje: " + msg);
             }
         }

@@ -12,6 +12,9 @@ public static class GameManager
     public static string NombrePuerto = "";
     public static int BAUDS = 9600;
 
+    //UI
+    public static bool UpdateUI = false;
+
     //Factor de escalado en GUI
     public static float EscaladoX = 1;
     public static float EscaladoY = 1;
@@ -22,7 +25,22 @@ public static class GameManager
     //Esado de conexión al Broker
     public static bool ConectadoABroker = false;
 
+
+    //Acción SUB UNSUB SUB = true; UNSUB = false
+    public static bool SubUnsub = true;
+
+
+    //Topico a suscribir
+    public static string topico = "";
+
+    //Valor del Dropdown
+    public static int valorDrop = 0;
+
     //comandos
     public static List<string> cmds = new List<string>();
-    
+
+    //Dirección del broker y tópicos
+    public static string broker = "iot.inventoteca.com";
+    public static string brokerPort = "1883";
+    public static List<string> topicos = new List<string>() { "topicos suscritos" };
 }

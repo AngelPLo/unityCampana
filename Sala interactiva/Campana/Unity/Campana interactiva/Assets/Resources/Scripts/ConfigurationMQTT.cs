@@ -7,11 +7,13 @@ using TMPro;
 
 public class ConfigurationMQTT : MonoBehaviour
 {
-    //Objetos de juego y componentes
-    public GameObject PortsInput;
-    public GameObject BrokerInput;
-    TMP_InputField BrokerI;
-    TMP_InputField PortsI;
+    //Objetos de UI y componentes
+    public TMP_InputField PortsInput;
+    public TMP_InputField BrokerInput;
+    public TMP_InputField TopicInput;
+    public Button ConnectDisconnect;
+    public Button SubUnsub;
+    public TMP_Dropdown TopicList;
 
     //Variables
     string[] PuertosDisponibles;
@@ -24,12 +26,14 @@ public class ConfigurationMQTT : MonoBehaviour
 
     void Awake()
     {
-        // Asignamos los componentes a sus variables
-        PortsI = PortsInput.GetComponent<TMP_InputField>();
-        BrokerI = BrokerInput.GetComponent<TMP_InputField>();
+        // Carga la dirección del broker y puerto a sus
+        // InputFields correspondientes
+
+        BrokerInput.text = GameManager.broker;
+        PortsInput.text = GameManager.brokerPort;
 
         /// DEBUG
-        if ( !PortsI || !BrokerI)
+        if ( !PortsInput || !BrokerInput || !TopicInput || !TopicList)
         {
             Debug.LogError("No se encontró alguna de las listas de opciones");
         }
@@ -38,14 +42,16 @@ public class ConfigurationMQTT : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        
-
+        UpdateUI();
     }
 
     // Update is called once per frame
-    void Update()
+    void LateUpdate()
     {
-        
+        if (GameManager.UpdateUI)
+        {
+            UpdateUI();
+        }
     }
 
     public void OcultarConfiguracion()
@@ -76,5 +82,92 @@ public class ConfigurationMQTT : MonoBehaviour
 
         //Si se necesitan reescalar más GUI objects se pueden ir agregando acá
         Debug.Log("Resolución actualizada: " + Screen.currentResolution);
+    }
+
+    void UpdateUI()
+    {
+        Debug.Log(TopicList.value);
+        BrokerInput.text = GameManager.broker;
+        PortsInput.text = GameManager.brokerPort;
+        TopicList.ClearOptions();
+        TopicList.AddOptions(GameManager.topicos);
+        TopicList.value = GameManager.valorDrop;
+        ConnectDisconnect.interactable = true;
+        // Si se está conectado al Broker se bloquea la edición de la dirección
+        // y del puerto del Broker así como de los tópicos
+        if (!GameManager.ConectadoABroker)
+        {
+            BrokerInput.interactable = true;
+            PortsInput.interactable = BrokerInput.interactable;
+            TopicInput.interactable = false;
+            SubUnsub.interactable = false;
+            TopicList.interactable = false;
+            //ConnectDisconnect.gameObject.GetComponent<>().color = new Color(109, 133, 179, 180);
+            //ConnectDisconnect.image.color = new Color(109, 133, 179, 180);
+            ConnectDisconnect.gameObject.GetComponentInChildren<TextMeshProUGUI>().text = "Conectar";
+            
+        }
+        else
+        {
+            BrokerInput.interactable = false;
+            PortsInput.interactable = BrokerInput.interactable;
+            TopicInput.interactable = true;
+            SubUnsub.interactable = true;
+            TopicList.interactable = true;
+            //ConnectDisconnect.image.color = new Color(255, 47, 0, 180);
+            ConnectDisconnect.gameObject.GetComponentInChildren<TextMeshProUGUI>().text = "Desconectar";
+        }
+
+        if(!GameManager.SubUnsub)
+        {
+            //GameManager.topicos.IndexOf()
+            int indiceLista = TopicList.value;
+            TopicInput.text = TopicInput.text;
+            //TopicInput.text = GameManager.topicos[indiceLista];
+            //SubUnsub.image.color = new Color(255, 47, 0, 180);
+            SubUnsub.gameObject.GetComponentInChildren<TextMeshProUGUI>().text = "Unsub";
+        }
+        else
+        {
+            TopicInput.text = TopicInput.text;
+            //SubUnsub.image.color = new Color(255, 47, 0, 180);
+            SubUnsub.gameObject.GetComponentInChildren<TextMeshProUGUI>().text = "Sub";
+        }
+
+        if(BrokerInput.text == "" || PortsInput.text == "")
+        {
+            ConnectDisconnect.interactable = false;
+        }
+        if(TopicInput.text == "")
+        {
+            SubUnsub.interactable = false;
+        }
+        GameManager.UpdateUI = false;
+
+    }
+
+
+    public void AsignarSub(string topico)
+    {
+        GameManager.topico = topico;
+        //TopicList.value = 0;
+        GameManager.SubUnsub = true;
+        if (GameManager.topicos.Contains(topico)) GameManager.SubUnsub = false;
+        Debug.LogFormat(GameManager.topico + ",{0}",GameManager.SubUnsub);
+        GameManager.UpdateUI = true;
+
+    }
+
+    public void Dropdown(int value)
+    {
+        GameManager.valorDrop = value;
+        //GameManager.UpdateUI = true;
+        //GameManager.SubUnsub = true;
+        if(value != 0)
+        {
+            TopicInput.text = TopicList.options[value].text;
+        }
+        Debug.Log("Hola");
+        //if (GameManager.topicos.Contains(TopicList.options[value].text)) GameManager.SubUnsub = false;
     }
 }
