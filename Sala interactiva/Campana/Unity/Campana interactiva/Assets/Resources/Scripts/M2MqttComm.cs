@@ -76,6 +76,8 @@ namespace M2MqttUnity.Examples
         
         #region conexionBroker
 
+
+
         //Se carga la dirección IP  del Broker a memoria (como propiedad de la clase base M2MQTTUnityClient)
         //Solo se ocupa cuando se quiera cambiar el broker
         //Broker default: 'iot.inventoteca.com'
@@ -104,8 +106,6 @@ namespace M2MqttUnity.Examples
         }
 
 
-
-
         protected override void OnConnecting()
         {
             base.OnConnecting();
@@ -115,8 +115,9 @@ namespace M2MqttUnity.Examples
         protected override void OnConnected()
         {
             base.OnConnected();
-            SetUiMessage("Connected to broker on " + brokerAddress + "\n");
             GameManager.ConectadoABroker = true;
+            GameManager.OcultarConfiguracion();
+            SetUiMessage("Connected to broker on " + brokerAddress + "\n");
             GameManager.UpdateUI = true;
         }
 

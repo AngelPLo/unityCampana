@@ -1,9 +1,15 @@
+//librerias del sistema
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
 using System.IO.Ports;
+
+//Librerias de Unity
+using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+
+//Librerias de MQTT
+using M2MqttUnity.Examples;
 
 public class ConfigurationMQTT : MonoBehaviour
 {
@@ -14,6 +20,9 @@ public class ConfigurationMQTT : MonoBehaviour
     public Button ConnectDisconnect;
     public Button SubUnsub;
     public TMP_Dropdown TopicList;
+    public M2MqttComm MQTTclient;
+    public GameObject Stats;
+
 
     //Variables
     string[] PuertosDisponibles;
@@ -26,6 +35,16 @@ public class ConfigurationMQTT : MonoBehaviour
 
     void Awake()
     {
+        // Referencia el GO del panel de configuración como propiedad de la clase
+        // GameManager
+        GameManager.AttachGO();
+
+        //Bloqueamos la orientación a portrait
+        Screen.autorotateToLandscapeLeft = false;
+        Screen.autorotateToLandscapeRight = false;
+        Screen.autorotateToPortraitUpsideDown = false;
+
+
         // Carga la dirección del broker y puerto a sus
         // InputFields correspondientes
 
@@ -38,14 +57,19 @@ public class ConfigurationMQTT : MonoBehaviour
             Debug.LogError("No se encontró alguna de las listas de opciones");
         }
 
+        //Conecta al broker y (automáticamente suscribe a los tópicos)
+        MQTTclient.SetBrokerAddress(GameManager.broker);
+        MQTTclient.SetBrokerPort(GameManager.brokerPort);
+        MQTTclient.Connect();
+
     }
-    // Start is called before the first frame update
+    // Actualiza el panel de configuración al entrar a la App
     void Start()
     {
         UpdateUI();
     }
 
-    // Update is called once per frame
+    // Se actualiza el panel de configuración después de todos los Update 
     void LateUpdate()
     {
         if (GameManager.UpdateUI)
@@ -54,19 +78,20 @@ public class ConfigurationMQTT : MonoBehaviour
         }
     }
 
+    //Oculta el panel de la configuración del GUI
     public void OcultarConfiguracion()
     {
-        if (GameManager.ConectadoABroker)
-        {
-            gameObject.SetActive(false);
-        }
+        GameManager.OcultarConfiguracion();
     }
 
+    //Muestra el panel de configuración del GUI
     public void MostrarConfiguracion()
     {
-        gameObject.SetActive(true);
+        GameManager.MostrarConfiguracion();
     }
 
+
+    //Se encarga de reescalar el GUI (no se ocupa, en Android no hay cambio dinámico del tamaño de pantalla)
     public void RescaleGUI()
     {
         Debug.Log("Resolución anterior:" + Screen.currentResolution);
@@ -84,90 +109,98 @@ public class ConfigurationMQTT : MonoBehaviour
         Debug.Log("Resolución actualizada: " + Screen.currentResolution);
     }
 
+    //Hace actualización de los botones y texto de las cajas de configuración del panel
     void UpdateUI()
     {
-        Debug.Log(TopicList.value);
         BrokerInput.text = GameManager.broker;
         PortsInput.text = GameManager.brokerPort;
+
         TopicList.ClearOptions();
         TopicList.AddOptions(GameManager.topicos);
-        TopicList.value = GameManager.valorDrop;
+        //TopicList.value = GameManager.valorDrop;
+
         ConnectDisconnect.interactable = true;
+
         // Si se está conectado al Broker se bloquea la edición de la dirección
         // y del puerto del Broker así como de los tópicos
         if (!GameManager.ConectadoABroker)
         {
             BrokerInput.interactable = true;
-            PortsInput.interactable = BrokerInput.interactable;
+            PortsInput.interactable = true;
             TopicInput.interactable = false;
             SubUnsub.interactable = false;
             TopicList.interactable = false;
-            //ConnectDisconnect.gameObject.GetComponent<>().color = new Color(109, 133, 179, 180);
-            //ConnectDisconnect.image.color = new Color(109, 133, 179, 180);
             ConnectDisconnect.gameObject.GetComponentInChildren<TextMeshProUGUI>().text = "Conectar";
             
         }
         else
         {
             BrokerInput.interactable = false;
-            PortsInput.interactable = BrokerInput.interactable;
+            PortsInput.interactable = false;
             TopicInput.interactable = true;
             SubUnsub.interactable = true;
             TopicList.interactable = true;
-            //ConnectDisconnect.image.color = new Color(255, 47, 0, 180);
             ConnectDisconnect.gameObject.GetComponentInChildren<TextMeshProUGUI>().text = "Desconectar";
         }
 
+        //Cambia el texto del boton de suscribirse/desuscribirse
         if(!GameManager.SubUnsub)
         {
-            //GameManager.topicos.IndexOf()
-            int indiceLista = TopicList.value;
+            //int indiceLista = TopicList.value;
             TopicInput.text = TopicInput.text;
-            //TopicInput.text = GameManager.topicos[indiceLista];
-            //SubUnsub.image.color = new Color(255, 47, 0, 180);
             SubUnsub.gameObject.GetComponentInChildren<TextMeshProUGUI>().text = "Unsub";
         }
         else
         {
             TopicInput.text = TopicInput.text;
-            //SubUnsub.image.color = new Color(255, 47, 0, 180);
             SubUnsub.gameObject.GetComponentInChildren<TextMeshProUGUI>().text = "Sub";
         }
 
-        if(BrokerInput.text == "" || PortsInput.text == "")
+        // Si no hay texto en la caja de texto de la dirección del broker o el puerto de acceso y
+        // no está conectado entonces el botón de conectarse se bloquea, si está conectado no se 
+        // bloquea para que se pueda desconectar
+        if((BrokerInput.text == "" || PortsInput.text == "") && !GameManager.ConectadoABroker)
         {
             ConnectDisconnect.interactable = false;
         }
+
+        //Si la caja de texto de los tópicos está vacía se bloquea el botón de suscripción
         if(TopicInput.text == "")
         {
             SubUnsub.interactable = false;
         }
+
         GameManager.UpdateUI = false;
 
     }
 
-
+    // Actualiza el valor estático GameManager.topico (utilizado por el método de subscribeToTopic)
+    // revisa si ya se está suscrito al tópico y actualiza el botón de suscripción acorde al resultado
     public void AsignarSub(string topico)
     {
         GameManager.topico = topico;
-        //TopicList.value = 0;
         GameManager.SubUnsub = true;
         if (GameManager.topicos.Contains(topico)) GameManager.SubUnsub = false;
-        Debug.LogFormat(GameManager.topico + ",{0}",GameManager.SubUnsub);
+        //Debug.LogFormat(GameManager.topico + ",{0}",GameManager.SubUnsub);
         GameManager.UpdateUI = true;
 
     }
 
+    // Actualiza el valor de la caja de texto de los tópicos de acuerdo al valor seleccionado del
+    // Dropdown
     public void Dropdown(int value)
     {
         GameManager.valorDrop = value;
-        //GameManager.UpdateUI = true;
-        //GameManager.SubUnsub = true;
         if(value != 0)
         {
             TopicInput.text = TopicList.options[value].text;
         }
         Debug.Log("Hola");
-        //if (GameManager.topicos.Contains(TopicList.options[value].text)) GameManager.SubUnsub = false;
     }
+
+    public void OcultarMostrarStats(bool status)
+    {
+        Stats.SetActive(status);
+    }
+
 }

@@ -5,6 +5,8 @@ using System.IO.Ports;
 
 public static class GameManager
 {
+    //
+
     // Puerto Serial a configurar en sitio 
     public static SerialPort PuertoSerial;
     public static bool PuertoConfigurado = false;
@@ -13,6 +15,7 @@ public static class GameManager
     public static int BAUDS = 9600;
 
     //UI
+    static GameObject ConfigPanel;
     public static bool UpdateUI = false;
 
     //Factor de escalado en GUI
@@ -43,4 +46,22 @@ public static class GameManager
     public static string broker = "iot.inventoteca.com";
     public static string brokerPort = "1883";
     public static List<string> topicos = new List<string>() { "topicos suscritos" };
+
+    //Metodos
+    public static void AttachGO()
+    {
+        ConfigPanel = GameObject.FindGameObjectWithTag("configuracion");
+    }
+
+    public static void OcultarConfiguracion()
+    {
+        if (ConectadoABroker)
+        {
+            ConfigPanel.SetActive(false);
+        }
+    }
+    public static void MostrarConfiguracion()
+    {
+        ConfigPanel.SetActive(true);
+    }
 }
